@@ -1,0 +1,30 @@
+backups/
+*.tgz
+*.tar.gz
+
+# never commit keys
+*.pem
+id_*
+*_deploy
+*_deploy.pub
+
+# never commit live data — this is the production DB (admins, clients,
+# invoices, applications, agreements). It stays on the server.
+app-live/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# app logs
+console.log
+*.log
+
+.DS_Store
+Thumbs.db
+node_modules/
+.env
+.env.*
+.claude/
+app-live/.astro/
