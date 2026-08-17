@@ -1,0 +1,299 @@
+// Inovision Studios admin — mirrors the legacy SQLite tables (app-live/data/inovision.db)
+// one-to-one in naming so the old data can be imported with scripts/import-legacy.ts.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+/// Staff who can log into /admin. Roles: owner | staff. `permissions` = JSON list of module keys a staff member may open (owner sees all).
+model Admin {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  name         String   @default("")
+  passwordHash String
+  role         String   @default("staff")
+  permissions  String[] @default([])
+  disabled     Boolean  @default(false)
+  createdBy    String   @default("")
+  createdAt    DateTime @default(now())
+}
+
+/// Contact-form messages (public site → Inbox)
+model Message {
+  id        Int       @id @default(autoincrement())
+  name      String
+  email     String
+  subject   String    @default("")
+  body      String
+  ip        String    @default("")
+  userAgent String    @default("")
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+}
+
+/// Careers applications
+model Application {
+  id         Int       @id @default(autoincrement())
+  role       String
+  name       String
+  email      String
+  phone      String    @default("")
+  message    String    @default("")
+  workAuth   String    @default("")
+  veteran    String    @default("")
+  disability String    @default("")
+  resumeName String    @default("")
+  resumeRef  String    @default("")
+  createdAt  DateTime  @default(now())
+  readAt     DateTime?
+}
+
+/// Blog / news posts (Markdown body)
+model Post {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  title     String
+  subtitle  String   @default("")
+  body      String   @default("")
+  template  String   @default("editorial")
+  images    String[] @default([])
+  published Boolean  @default(false)
+  views     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/// Portfolio / work gallery
+model GalleryItem {
+  id        Int      @id @default(autoincrement())
+  url       String
+  title     String   @default("")
+  category  String   @default("")
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model TeamMember {
+  id        Int      @id @default(autoincrement())
+  name      String
+  title     String   @default("")
+  image     String   @default("")
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+/// Internal team chat / wall
+model TeamMessage {
+  id          Int      @id @default(autoincrement())
+  authorEmail String
+  authorName  String   @default("")
+  body        String   @default("")
+  image       String   @default("")
+  createdAt   DateTime @default(now())
+}
+
+/// Agency clients (also portal users)
+model Client {
+  id             Int       @id @default(autoincrement())
+  name           String
+  email          String    @default("")
+  phone          String    @default("")
+  site           String    @default("")
+  plan           String    @default("")
+  hosting        Boolean   @default(false)
+  ai             Boolean   @default(false)
+  extra          Float     @default(0)
+  projectFee     Float     @default(0)
+  depositAmount  Float     @default(0)
+  depositPaid    Boolean   @default(false)
+  stage          String    @default("onboarding")
+  stageAt        DateTime?
+  brief          String    @default("")
+  notes          String    @default("")
+  launchedAt     DateTime?
+  subActive      Boolean   @default(false)
+  subId          String    @default("")
+  hzSubscriptionId String  @default("")
+  passwordHash   String    @default("")
+  portalToken    String    @default("")
+  createdAt      DateTime  @default(now())
+  invoices       Invoice[]
+  milestones     Milestone[]
+  messages       ClientMessage[]
+  deployments    Deployment[]
+  agreements     Agreement[]
+}
+
+model Invoice {
+  id          Int       @id @default(autoincrement())
+  clientId    Int
+  client      Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  period      String    @default("")
+  description String    @default("")
+  recipient   String    @default("")
+  amount      Float     @default(0)
+  status      String    @default("unpaid")
+  payUrl      String    @default("")
+  token       String    @default("")
+  createdAt   DateTime  @default(now())
+  paidAt      DateTime?
+}
+
+/// Simple money in / money out book
+model Ledger {
+  id        Int      @id @default(autoincrement())
+  ts        DateTime @default(now())
+  kind      String   // income | expense
+  category  String   @default("")
+  amount    Float    @default(0)
+  note      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Milestone {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  title     String
+  due       String   @default("")
+  done      Boolean  @default(false)
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model ClientMessage {
+  id           Int      @id @default(autoincrement())
+  clientId     Int
+  client       Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sender       String   @default("team") // team | client
+  author       String   @default("")
+  body         String
+  readByClient Boolean  @default(false)
+  readByTeam   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model Deployment {
+  id       Int      @id @default(autoincrement())
+  clientId Int
+  client   Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  summary  String
+  url      String   @default("")
+  ts       DateTime @default(now())
+}
+
+model Agreement {
+  id                Int      @id @default(autoincrement())
+  clientId          Int
+  client            Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tosVersion        String
+  privacyVersion    String
+  agreedTos         Boolean  @default(false)
+  agreedPrivacy     Boolean  @default(false)
+  agreedArbitration Boolean  @default(false)
+  ip                String   @default("")
+  userAgent         String   @default("")
+  fullName          String   @default("")
+  createdAt         DateTime @default(now())
+}
+
+/// Internal projects (not necessarily tied to a client)
+model Project {
+  id        Int             @id @default(autoincrement())
+  name      String
+  status    String          @default("Active")
+  createdAt DateTime        @default(now())
+  updates   ProjectUpdate[]
+}
+
+model ProjectUpdate {
+  id         Int      @id @default(autoincrement())
+  projectId  Int
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  authorName String   @default("")
+  body       String
+  kind       String   @default("update")
+  createdAt  DateTime @default(now())
+}
+
+/// Website audits sold to prospects
+model Audit {
+  id        Int         @id @default(autoincrement())
+  company   String
+  contact   String      @default("")
+  email     String      @default("")
+  status    String      @default("in_progress")
+  summary   String      @default("")
+  createdAt DateTime    @default(now())
+  items     AuditItem[]
+}
+
+model AuditItem {
+  id             Int      @id @default(autoincrement())
+  auditId        Int
+  audit          Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  area           String   @default("")
+  finding        String
+  recommendation String   @default("")
+  impact         String   @default("medium")
+  effort         String   @default("medium")
+  done           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+}
+
+/// AI-generated HTML mockups + their chat transcript
+model Mockup {
+  id        Int      @id @default(autoincrement())
+  name      String
+  html      String   @default("")
+  messages  Json     @default("[]")
+  updatedAt DateTime @updatedAt
+}
+
+/// Aggregated industry news (RSS)
+model News {
+  id          Int       @id @default(autoincrement())
+  source      String
+  title       String
+  link        String    @unique
+  summary     String    @default("")
+  image       String    @default("")
+  publishedAt DateTime?
+  fetchedAt   DateTime  @default(now())
+}
+
+/// Key/value site settings (SEO, business info, feature flags)
+model Setting {
+  key   String @id
+  value String @default("")
+}
+
+/// Uploaded files (images, resumes) stored in Postgres, served by /api/img/<hash>
+model Image {
+  id        Int      @id @default(autoincrement())
+  hash      String?  @unique
+  mime      String   @default("image/webp")
+  bytes     Bytes
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+}
+
+/// First-party analytics (pageviews/clicks from the public site)
+model Event {
+  id        Int      @id @default(autoincrement())
+  kind      String
+  path      String   @default("")
+  label     String   @default("")
+  ref       String   @default("")
+  visitor   String   @default("")
+  ua        String   @default("")
+  createdAt DateTime @default(now())
+  @@index([kind, createdAt])
+  @@index([createdAt])
+}
