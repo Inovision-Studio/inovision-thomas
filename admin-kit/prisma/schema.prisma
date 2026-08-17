@@ -1,0 +1,194 @@
+// Mi Budz — owned rebuild. Full schema mirroring the original admin sections.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Images stored in Postgres so upload + serving work on serverless (no disk needed).
+// Served two ways to match original: /api/image/<id> and /api/img/<hash>.
+model Image {
+  id        Int      @id @default(autoincrement())
+  hash      String?  @unique // e.g. b29552_<uuid>.webp
+  mime      String   @default("image/webp")
+  bytes     Bytes
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+}
+
+model Product {
+  id          Int      @id @default(autoincrement())
+  slug        String   @unique
+  name        String
+  category    String   @default("Accessories")
+  priceMin    Float
+  priceMax    Float?
+  description String   @default("")
+  images      String[] @default([]) // image refs: /api/img/<hash> or /api/image/<id>
+  published   Boolean  @default(true)
+  sort        Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BlogPost {
+  id        Int      @id @default(autoincrement())
+  slug      String   @unique
+  title     String
+  body      String   @default("")
+  excerpt   String   @default("")
+  tags      String[] @default([])
+  image     String?
+  published Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Coupon {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  label     String   @default("")
+  kind      String   @default("slot") // slot | manual
+  discount  String   @default("")     // free-text prize/discount
+  active    Boolean  @default(true)
+  usedCount Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  name      String
+  stars     Int      @default(5)
+  text      String   @default("")
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model Gallery {
+  id     Int            @id @default(autoincrement())
+  key    String         @unique // hero | coverflow | marquee
+  title  String
+  images GalleryImage[]
+}
+
+model GalleryImage {
+  id        Int     @id @default(autoincrement())
+  gallery   Gallery @relation(fields: [galleryId], references: [id], onDelete: Cascade)
+  galleryId Int
+  imageRef  String  // /api/img/<hash> or /api/image/<id>
+  sort      Int     @default(0)
+}
+
+model VipMember {
+  id         Int      @id @default(autoincrement())
+  email      String
+  couponWon  String?
+  createdAt  DateTime @default(now())
+}
+
+model NewsletterSub {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Order {
+  id        Int      @id @default(autoincrement())
+  customer  String   @default("")
+  phone     String   @default("")
+  items     Json     @default("[]")
+  status    String   @default("open") // open | picked_up
+  createdAt DateTime @default(now())
+}
+
+model StaffMember {
+  id        Int          @id @default(autoincrement())
+  name      String
+  pinHash   String
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  punches   StaffPunch[]
+}
+
+model StaffPunch {
+  id        Int         @id @default(autoincrement())
+  staff     StaffMember @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  staffId   Int
+  kind      String      // in | out
+  lat       Float?
+  lng       Float?
+  at        DateTime    @default(now())
+}
+
+model StaffTask {
+  id        Int       @id @default(autoincrement())
+  text      String
+  done      Boolean   @default(false)
+  doneBy    String?
+  doneAt    DateTime?
+  createdAt DateTime  @default(now())
+}
+
+model BusinessHour {
+  id     Int     @id @default(autoincrement())
+  day    Int     @unique // 0=Sun .. 6=Sat
+  closed Boolean @default(false)
+  open   String  @default("9 AM")
+  close  String  @default("10 PM")
+}
+
+// Editable home-page text blocks and misc key/value site config + connectors.
+model Setting {
+  key   String @id
+  value String @default("")
+}
+
+model Location {
+  id        Int      @id @default(autoincrement())
+  name      String // e.g. "Rochester Hills"
+  address   String
+  city      String   @default("")
+  state     String   @default("MI")
+  zip       String   @default("")
+  phone     String   @default("")
+  mapsUrl   String   @default("") // exact share link; wins over lat/lng when set
+  lat       Float?
+  lng       Float?
+  hours     String   @default("") // free text, e.g. "9 AM – 11 PM Daily"
+  published Boolean  @default(true)
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model JobApplication {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @default("")
+  phone     String   @default("")
+  position  String   @default("")
+  message   String   @default("")
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// First-party analytics. No cookies, no raw IP: `visitor` is a daily-rotating
+// HMAC so uniques can be counted without identifying anyone.
+model Event {
+  id        Int      @id @default(autoincrement())
+  kind      String
+  path      String   @default("")
+  label     String   @default("")
+  ref       String   @default("")
+  visitor   String   @default("")
+  ua        String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([createdAt])
+}

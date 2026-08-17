@@ -1,0 +1,42 @@
+name: nightly-db-backup
+# Dumps every table + image to the orphan `backups` branch of this repo, once a
+# day and on demand. Supabase free tier keeps no backups of its own — this is it.
+on:
+  schedule:
+    - cron: "17 8 * * *"   # 08:17 UTC daily (~04:17 Detroit)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: backup
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci --ignore-scripts && npx prisma generate
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx tsx scripts/backup.ts snapshot
+      - name: Commit to backups branch
+        run: |
+          set -e
+          DAY=$(date -u +%F)
+          git config user.name "backup-bot"
+          git config user.email "backup-bot@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin backups >/dev/null; then
+            git fetch origin backups
+            git worktree add ../bk origin/backups
+          else
+            git worktree add --detach ../bk
+            (cd ../bk && git checkout --orphan backups && git rm -rfq . && git commit --allow-empty -m "init backups")
+          fi
+          rm -rf ../bk/latest && cp -r snapshot ../bk/latest
+          mkdir -p ../bk/daily && rm -rf "../bk/daily/$DAY" && cp -r snapshot "../bk/daily/$DAY"
+          # keep last 30 dailies
+          (cd ../bk/daily && ls -1 | sort | head -n -30 | xargs -r rm -rf)
+          cd ../bk && git add -A && git commit -qm "backup $DAY: $(node -e 'const m=require("./latest/manifest.json").tables;console.log(Object.entries(m).map(([k,v])=>k+"="+v).join(" "))')" || echo "no changes"
+          git push origin HEAD:backups
