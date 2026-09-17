@@ -1,5 +1,9 @@
 # Deploying to Coolify
 
+> Legacy reference: the current Inovision main website runs on Vercel from a
+> separate repository. Identify the intended legacy deployment before using
+> this guide; do not replace the current site with this compiled bundle.
+
 Step-by-step for deploying this app (`app-live/`) to your own VPS running
 Coolify. See [`MIGRATION.md`](MIGRATION.md) for background on why this is
 build-output-only (no Astro source exists), and [`ENV.md`](ENV.md) for the
@@ -35,9 +39,8 @@ Coolify → your app → **Environment Variables** tab → add each key/value
 below.
 
 Two groups here:
-- **Ready to paste as-is** — fixed config, or random secrets that were
-  generated for you (a secret just needs to be long and unpredictable, it
-  doesn't need to come from anywhere specific).
+- **Fixed configuration** — server settings shown below. Verify the domain
+  belongs to the deployment before using it.
 - **You must replace** — real credentials tied to your accounts (admin
   login, Stripe, HubSpot, fal.ai). Demo/format values only, shown so you
   know what shape they take.
@@ -49,12 +52,12 @@ PORT=3000
 ASTRO_NODE_AUTOSTART=true
 NODE_ENV=production
 
-# --- your domain (copy as-is, already correct) ---
+# --- your domain (verify this is the intended deployment) ---
 PUBLIC_SITE_URL=https://inovisionstudios.com
 
-# --- already-generated random secrets (copy as-is) ---
-AUTH_SECRET=0d399ddca18ca2dc6f63747d007c515185a069e4460158904e6dc7d9b1906391
-NEWS_CRON_KEY=ef3755ca010cde79ef69e11c56df36243f5189e423bae9b9
+# --- generate unique secrets locally; do not use values from Git history ---
+AUTH_SECRET=<generate with openssl rand -hex 32>
+NEWS_CRON_KEY=<generate separately with openssl rand -hex 24>
 
 # =====================================================
 # EVERYTHING BELOW HERE YOU MUST REPLACE - demo values only
@@ -62,7 +65,7 @@ NEWS_CRON_KEY=ef3755ca010cde79ef69e11c56df36243f5189e423bae9b9
 
 # --- admin login: pick your own real email + a strong password ---
 ADMIN_EMAIL=admin@inovisionstudios.com
-ADMIN_PASSWORD=Ch@ngeThis-Str0ng-2026!
+ADMIN_PASSWORD=<choose a unique strong password>
 ADMIN_NAME=Admin
 
 # --- Stripe (payments, invoices) - from your Stripe dashboard ---
@@ -80,9 +83,18 @@ FAL_KEY=<paste your fal.ai key here: key-id:key-secret>
 #   FAL_EDIT_MODEL  -> fal-ai/bytedance/seedream/v4.5/edit
 ```
 
-⚠️ `AUTH_SECRET` and `NEWS_CRON_KEY` above were generated freshly for this
-guide and aren't used anywhere else — safe to use directly. Still, if this
-file is ever public, rotate them (generate new ones with `openssl rand -hex 32`).
+**Security notice:** earlier revisions of this public guide contained literal
+`AUTH_SECRET` and `NEWS_CRON_KEY` values. Treat those values as exposed. If an
+existing deployment uses either value, its owner must rotate it in that
+deployment and update any cron caller using the cron key. Removing values from
+this guide does not revoke them or remove Git history. This documentation change
+does not change any deployed credentials.
+
+For a new deployment, run `openssl rand -hex 32` for `AUTH_SECRET` and a separate
+`openssl rand -hex 24` for `NEWS_CRON_KEY` in your own terminal. Save them directly
+in the deployment secret settings and your company password manager. Never commit
+or paste the generated values into chat. The angle-bracket values above are
+placeholders and must be replaced; do not paste the example block into a shell.
 
 Full explanation of what each one does: [`ENV.md`](ENV.md). Leave out
 `HOSTINGER_API_TOKEN` — that only worked on the old host.
